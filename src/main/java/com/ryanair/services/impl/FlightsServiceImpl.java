@@ -30,7 +30,9 @@ public class FlightsServiceImpl implements FlightsService {
     @Override
     public Flux<FlightResult> findFlightsBetween(String departure, String arrival, Date departureDateTime, Date arrivalDateTime) {
         Flux<Route> allPossiblyFlights = apiClient.findAllRoutes().filter(element ->
-                element.getAirportFrom().equals(departure) || element.getAirportTo().equals(arrival));
+                element.getConnectingAirport() == null &&
+                        element.getOperator().equals("RYANAIR") &&
+                        (element.getAirportFrom().equals(departure) || element.getAirportTo().equals(arrival)));
 
         Flux<FlightResult> direcFlights = allPossiblyFlights.filter(element ->
                 element.getAirportFrom().equals(departure) && element.getAirportTo().equals(arrival))
@@ -38,15 +40,15 @@ public class FlightsServiceImpl implements FlightsService {
 
         Flux<Route> bridgeFlights = allPossiblyFlights.filter(element ->
                 element.getAirportFrom().equals(departure) && element.getAirportTo().equals(arrival)
-                || element.getAirportFrom().equals(departure) && !element.getAirportTo().equals(arrival)
-                || !element.getAirportFrom().equals(departure) && element.getAirportTo().equals(arrival));
+                        || element.getAirportFrom().equals(departure) && !element.getAirportTo().equals(arrival)
+                        || !element.getAirportFrom().equals(departure) && element.getAirportTo().equals(arrival));
 
         return bridgeFlights.collectMap(route -> route.getAirportFrom() + route.getAirportTo())
                 .flatMapMany(map ->
                         allPossiblyFlights
                                 .filter(flight ->
                                         map.containsKey(flight.getAirportFrom() + flight.getAirportTo())
-                                && (map.containsKey(departure + flight.getAirportTo()) && map.containsKey(flight.getAirportTo() + arrival)))
+                                                && (map.containsKey(departure + flight.getAirportTo()) && map.containsKey(flight.getAirportTo() + arrival)))
                                 .flatMap(flight ->
                                         buildFlightResultFromRoute(
                                                 departure,
@@ -55,31 +57,31 @@ public class FlightsServiceImpl implements FlightsService {
                                                 departureDateTime,
                                                 arrivalDateTime))
                 ).concatWith(direcFlights)
-                 .filter(flight -> isValidFlight(departureDateTime, arrivalDateTime, flight))
+                .filter(flight -> isValidFlight(departureDateTime, arrivalDateTime, flight))
                 .filter(flight ->
                         isBridgeInTime(flight, departure, arrival));
 
     }
 
-    public boolean isBridgeInTime(FlightResult flight, String departure, String arrival){
+    public boolean isBridgeInTime(FlightResult flight, String departure, String arrival) {
         Flight aux = flight.getLegs().get(0);
         Flight dep = aux.getDepartureAirport().equals(departure) ? aux : flight.getLegs().get(1);
         Flight arr = aux.getArrivalAirport().equals(arrival) ? aux : flight.getLegs().get(1);
         return flight.getStops() == 0
                 || DateUtils.addHours(dep.getArrivalDateTime(), 2).getTime()
-                    < arr.getDepartureDateTime().getTime();
+                < arr.getDepartureDateTime().getTime();
     }
 
     public boolean isValidFlight(Date departureDateTime, Date arrivalDateTime, FlightResult flight) {
         return flight.getStops() + 1 == flight.getLegs().size()
                 && flight.getLegs().stream().map(leg ->
-                    leg.getDepartureDateTime().getTime() > departureDateTime.getTime() && leg.getArrivalDateTime().getTime() < arrivalDateTime.getTime()
-                ).reduce(true, (res, leg) -> res && leg);
+                leg.getDepartureDateTime().getTime() > departureDateTime.getTime() && leg.getArrivalDateTime().getTime() < arrivalDateTime.getTime()
+        ).reduce(true, (res, leg) -> res && leg);
     }
 
     public Mono<FlightResult> buildFlightResultFromRoute(String from, String to, List<Route> routes, Date departureDateTime, Date arrivalDateTime) {
         return Flux.fromIterable(routes.stream().map(route ->
-            getFlightResultFromRoute(route, arrivalDateTime, departureDateTime)
+                getFlightResultFromRoute(route, arrivalDateTime, departureDateTime)
         ).collect(Collectors.toList())).flatMap(x -> x).reduce(FlightResult.builder().legs(Collections.emptyList()).build(), (result, leg) ->
                 FlightResult.builder()
                         .stops(1)
@@ -125,7 +127,7 @@ public class FlightsServiceImpl implements FlightsService {
                                                                 .departureAirport(route.getAirportFrom())
                                                                 .build()
                                                 ).collect(Collectors.toList()))
-                                                        .stops(day.getFlights().size() -1)
+                                                        .stops(day.getFlights().size() - 1)
                                                         .build())
                                         .collect(Collectors.toList())
                         ));
