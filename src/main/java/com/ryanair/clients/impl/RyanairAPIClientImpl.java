@@ -30,11 +30,11 @@ public class RyanairAPIClientImpl implements RyanairAPIClient {
     private final Long minBackoff;
 
     public RyanairAPIClientImpl(WebClient.Builder webClientBuilder,
-                                @Value("${daas-events.base-url}") String baseUrl,
-                                @Value("${daas-events.base-url}") String findAllRoutesPath,
-                                @Value("${daas-events.base-url}") String findAllflightsFromPath,
-                                @Value("${daas-events.retry.max-attempts:5}") Integer maxAttempts,
-                                @Value("${daas-events.retry.min-backoff-ms:100}") Long minBackoff
+                                @Value("${ryanair.api.base-url}") String baseUrl,
+                                @Value("${ryanair.api.findAllRoutesPath}") String findAllRoutesPath,
+                                @Value("${ryanair.api.findAllflightsFromPath}") String findAllflightsFromPath,
+                                @Value("${ryanair.api.retry.max-attempts:5}") Integer maxAttempts,
+                                @Value("${ryanair.api.retry.min-backoff-ms:100}") Long minBackoff
     ) {
         this.webClient = webClientBuilder.baseUrl(baseUrl)
                 .clientConnector(new ReactorClientHttpConnector(
@@ -68,10 +68,11 @@ public class RyanairAPIClientImpl implements RyanairAPIClient {
     }
 
     @Override
-    public Flux<Schedule> findAllflightsFrom(String from, int year, int month) {
+    public Flux<Schedule> findAllflightsFrom(String from, String to, int year, int month) {
         return this.webClient.get()
                 .uri(uriBuilder -> uriBuilder.path(findAllflightsFromPath)
-                        .build())
+                        .pathSegment(from, to, "years", "{year}", "months", "{month}")
+                        .build(year, month))
                 .retrieve()
                 .onStatus(HttpStatus.NOT_FOUND::equals, response -> {
                     log.warn("Find all routes not found");
@@ -79,7 +80,7 @@ public class RyanairAPIClientImpl implements RyanairAPIClient {
                 })
                 .onStatus(HttpStatus::is4xxClientError, response -> response.bodyToMono(String.class)
                         .flatMap(body -> {
-                            log.error("Client error in daas-flow-configurator: {}", body);
+                            log.error("Client error: {}", body);
                             return Mono.error(new NoRetryException());
                         }))
                 .bodyToFlux(Schedule.class)

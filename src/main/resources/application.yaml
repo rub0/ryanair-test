@@ -1,0 +1,8 @@
+ryanair:
+    api:
+        base-url: https://services-api.ryanair.com/
+        findAllRoutesPath: locate/3/routes
+        findAllflightsFromPath: timtbl/3/schedules/
+        retry:
+            max-attempts: 5
+            min-backoff-ms: 100

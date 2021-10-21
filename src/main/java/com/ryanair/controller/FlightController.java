@@ -1,16 +1,17 @@
 package com.ryanair.controller;
 
 import com.ryanair.entities.FlightResult;
+import com.ryanair.exception.NotFoundException;
 import com.ryanair.services.FlightsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Flux;
 
+import java.text.DateFormat;
 import java.util.Date;
 
 @Validated
@@ -22,14 +23,16 @@ public class FlightController {
 
     private final FlightsService service;
 
-    @GetMapping
+    @GetMapping("/{context}/interconnections")
     public Flux<FlightResult> findFlightsBetween(
-            @RequestParam(value = "departure", required = false) String departure,
-            @RequestParam(value = "arrival", required = false) String arrival,
-            @RequestParam(value = "departureDateTime", required = false) Date departureDateTime,
-            @RequestParam(value = "arrivalDateTime", required = false) Date arrivalDateTime
+            @PathVariable String context,
+            @RequestParam(value = "departure") String departure,
+            @RequestParam(value = "arrival") String arrival,
+            @RequestParam(value = "departureDateTime") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date departureDateTime,
+            @RequestParam(value = "arrivalDateTime") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date arrivalDateTime
     ){
 
-        return service.findFlightsBetween(departure, arrival, departureDateTime, arrivalDateTime);
+        return service.findFlightsBetween(departure, arrival, departureDateTime, arrivalDateTime)
+                .switchIfEmpty(Flux.error(new NotFoundException()));
     }
 }
